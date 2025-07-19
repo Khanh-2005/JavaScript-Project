@@ -1,0 +1,136 @@
+<%- include('./partials/header') %>
+
+<div class="container my-5">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>Order Details</h3>
+        <span
+          class="badge bg-<%= order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'danger' : 'primary' %>"
+        >
+          <%= order.status.toUpperCase() %>
+        </span>
+      </div>
+
+      <!-- Shipping Information -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <h5>Shipping Information</h5>
+          <p class="mb-1"><strong>Name:</strong> <%= order.fullName %></p>
+          <p class="mb-1"><strong>Phone:</strong> <%= order.phone %></p>
+          <p class="mb-1"><strong>Email:</strong> <%= order.email %></p>
+          <p class="mb-1">
+            <strong>Address:</strong>
+            <%= order.address %>, <%= order.ward %>, <%= order.district %>, <%=
+            order.city %>
+          </p>
+          <% if (order.note) { %>
+          <p class="mb-1"><strong>Note:</strong> <%= order.note %></p>
+          <% } %>
+        </div>
+        <div class="col-md-6">
+          <h5>Order Information</h5>
+          <p class="mb-1"><strong>Order ID:</strong> #<%= order.id %></p>
+          <p class="mb-1">
+            <strong>Order Date:</strong>
+            <%= moment(order.createdAt).format('MMMM D, YYYY h:mm A') %>
+          </p>
+          <p class="mb-1">
+            <strong>Last Updated:</strong>
+            <%= moment(order.updatedAt).format('MMMM D, YYYY h:mm A') %>
+          </p>
+        </div>
+      </div>
+
+      <!-- Order Items -->
+      <h5>Order Items</h5>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Price</th>
+              <th>Quantity</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% order.items.forEach(function(item) { %>
+            <tr>
+              <td>
+                <div class="d-flex align-items-center">
+                  <img
+                    src="<%= item.product.image || '/images/default-product.jpg' %>"
+                    alt="<%= item.product.name %>"
+                    class="me-2"
+                    style="width: 50px; height: 50px; object-fit: cover"
+                  />
+                  <span><%= item.product.name %></span>
+                </div>
+              </td>
+              <td>$<%= parseFloat(item.price).toFixed(2) %></td>
+              <td><%= item.quantity %></td>
+              <td class="text-end">
+                $<%= (parseFloat(item.price) * item.quantity).toFixed(2) %>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="text-end"><strong>Subtotal</strong></td>
+              <td class="text-end">
+                $<%= parseFloat(order.totalAmount).toFixed(2) %>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="3" class="text-end"><strong>Shipping</strong></td>
+              <td class="text-end">Free</td>
+            </tr>
+            <tr>
+              <td colspan="3" class="text-end"><strong>Total</strong></td>
+              <td class="text-end">
+                <strong
+                  >$<%= parseFloat(order.totalAmount).toFixed(2) %></strong
+                >
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Actions -->
+      <div class="text-end mt-4">
+        <a href="/orders" class="btn btn-secondary">Back to Orders</a>
+        <% if (order.status === 'pending') { %>
+        <button class="btn btn-danger" onclick="cancelOrder('<%= order.id %>')">
+          Cancel Order
+        </button>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function cancelOrder(orderId) {
+    if (confirm("Are you sure you want to cancel this order?")) {
+      try {
+        const response = await fetch(`/orders/${orderId}/cancel`, {
+          method: "POST",
+        });
+
+        if (response.ok) {
+          location.reload();
+        } else {
+          throw new Error("Failed to cancel order");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        alert("Failed to cancel order");
+      }
+    }
+  }
+</script>
+
+<%- include('./partials/footer') %>

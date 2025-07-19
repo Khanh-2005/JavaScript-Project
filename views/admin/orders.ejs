@@ -1,0 +1,658 @@
+<%- include('./partials/header') %>
+
+<!-- Add Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<!-- Add Moment.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Order Management</h2>
+    <div>
+      <button class="btn btn-outline-secondary me-2" onclick="exportOrders()">
+        <i class="fas fa-file-export"></i> Export
+      </button>
+      <select class="form-select d-inline-block w-auto" id="orderFilter">
+        <option value="all">All Orders</option>
+        <option value="pending">Pending</option>
+        <option value="processing">Processing</option>
+        <option value="shipped">Shipped</option>
+        <option value="delivered">Delivered</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Orders Summary Cards -->
+  <div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-primary shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div
+                class="text-xs font-weight-bold text-primary text-uppercase mb-1"
+              >
+                Total Orders
+              </div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800"><%= totalOrders %></div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-shopping-cart fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-success shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div
+                class="text-xs font-weight-bold text-success text-uppercase mb-1"
+              >
+                Revenue
+              </div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">$<%= totalRevenue.toFixed(2) %></div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-warning shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div
+                class="text-xs font-weight-bold text-warning text-uppercase mb-1"
+              >
+                Pending Orders
+              </div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800"><%= pendingOrders %></div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-clock fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders Table -->
+  <div class="card shadow mb-4">
+    <div class="card-header py-3">
+      <h6 class="m-0 font-weight-bold text-primary">Orders List</h6>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Total Amount</th>
+              <th>Status</th>
+              <th>Order Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (orders && orders.length > 0) { %>
+              <% orders.forEach(function(order) { %>
+                <tr>
+                  <td>#<%= order.id %></td>
+                  <td>
+                    <div><%= order.fullName %></div>
+                    <small class="text-muted"><%= order.email %></small>
+                  </td>
+                  <td>$<%= parseFloat(order.totalAmount).toFixed(2) %></td>
+                  <td>
+                    <select class="form-select form-select-sm status-select" 
+                            onchange="updateOrderStatus('<%= order.id %>', this.value)"
+                            style="width: 140px;">
+                      <option value="pending" <%= order.status === 'pending' ? 'selected' : '' %>>Pending</option>
+                      <option value="processing" <%= order.status === 'processing' ? 'selected' : '' %>>Processing</option>
+                      <option value="shipped" <%= order.status === 'shipped' ? 'selected' : '' %>>Shipped</option>
+                      <option value="delivered" <%= order.status === 'delivered' ? 'selected' : '' %>>Delivered</option>
+                      <option value="cancelled" <%= order.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                    </select>
+                  </td>
+                  <td><%= moment(order.createdAt).format('MMM D, YYYY HH:mm') %></td>
+                  <td>
+                    <button class="btn btn-sm btn-info" onclick="viewOrderDetails('<%= order.id %>')">
+                      <i class="fas fa-eye"></i> View
+                    </button>
+                  </td>
+                </tr>
+              <% }); %>
+            <% } else { %>
+              <tr>
+                <td colspan="6" class="text-center">No orders found</td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade" id="orderDetailsModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Order Details #<span id="modalOrderId"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <!-- Order Status Timeline -->
+          <div class="col-12 mb-4">
+            <div class="card">
+              <div class="card-body">
+                <div class="timeline-steps">
+                  <div class="timeline-step" data-status="pending">
+                    <div class="timeline-content">
+                      <div class="inner-circle"></div>
+                      <p class="h6 mt-3 mb-1">Pending</p>
+                    </div>
+                  </div>
+                  <div class="timeline-step" data-status="processing">
+                    <div class="timeline-content">
+                      <div class="inner-circle"></div>
+                      <p class="h6 mt-3 mb-1">Processing</p>
+                    </div>
+                  </div>
+                  <div class="timeline-step" data-status="shipped">
+                    <div class="timeline-content">
+                      <div class="inner-circle"></div>
+                      <p class="h6 mt-3 mb-1">Shipped</p>
+                    </div>
+                  </div>
+                  <div class="timeline-step" data-status="delivered">
+                    <div class="timeline-content">
+                      <div class="inner-circle"></div>
+                      <p class="h6 mt-3 mb-1">Delivered</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Info -->
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header">
+                <h6 class="mb-0">Order Information</h6>
+              </div>
+              <div class="card-body" id="orderInfo">
+                <!-- Will be populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Customer Info -->
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header">
+                <h6 class="mb-0">Customer Information</h6>
+              </div>
+              <div class="card-body" id="customerInfo">
+                <!-- Will be populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Items -->
+          <div class="col-12 mt-4">
+            <div class="card">
+              <div class="card-header">
+                <h6 class="mb-0">Order Items</h6>
+              </div>
+              <div class="card-body">
+                <div class="table-responsive" id="orderItems">
+                  <!-- Will be populated dynamically -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="d-flex justify-content-between align-items-center w-100">
+          <div>
+            <button type="button" class="btn btn-danger btn-lg" onclick="cancelOrder()" id="btnCancel">
+              <i class="fas fa-times-circle me-2"></i>
+              Cancel Order
+            </button>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary btn-lg" data-bs-dismiss="modal">
+              <i class="fas fa-times me-2"></i>
+              Close
+            </button>
+            <button type="button" class="btn btn-primary btn-lg" onclick="updateStatus()" id="btnNextStatus">
+              <i class="fas fa-check-circle me-2"></i>
+              Process Order
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .border-left-primary {
+    border-left: 4px solid #4e73df;
+  }
+  .border-left-success {
+    border-left: 4px solid #1cc88a;
+  }
+  .border-left-warning {
+    border-left: 4px solid #f6c23e;
+  }
+  .text-xs {
+    font-size: 0.7rem;
+  }
+  .text-gray-300 {
+    color: #dddfeb;
+  }
+  .text-gray-800 {
+    color: #5a5c69;
+  }
+  .timeline-steps {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+  }
+
+  .timeline-steps:before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 3px;
+    background: #e0e0e0;
+    top: 20px;
+  }
+
+  .timeline-step {
+    z-index: 1;
+    text-align: center;
+    position: relative;
+    width: 25%;
+  }
+
+  .timeline-step .inner-circle {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    margin: 0 auto;
+    border: 3px solid #fff;
+  }
+
+  .timeline-step.active .inner-circle {
+    background: #28a745;
+  }
+
+  .timeline-step.completed .inner-circle {
+    background: #007bff;
+  }
+
+  .order-item-image {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+  }
+
+  .modal-footer {
+    border-top: 1px solid #dee2e6;
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+  }
+
+  .modal-footer .btn {
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    min-width: 160px;
+  }
+
+  .modal-footer .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+
+  .modal-footer .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+  }
+
+  .modal-footer .btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+  }
+
+  .modal-footer .btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+  }
+
+  .modal-footer .btn-secondary:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+  }
+
+  .modal-footer .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+
+  .modal-footer .btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+  }
+
+  .modal-footer .btn i {
+    font-size: 1.1rem;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  .modal-footer .btn:active {
+    animation: pulse 0.3s ease;
+  }
+
+  @media (max-width: 768px) {
+    .modal-footer {
+      padding: 1rem;
+    }
+    
+    .modal-footer .btn {
+      padding: 0.5rem 1rem;
+      min-width: auto;
+    }
+    
+    .modal-footer .d-flex {
+      flex-direction: column;
+      gap: 1rem;
+      width: 100%;
+    }
+    
+    .modal-footer .btn {
+      width: 100%;
+    }
+  }
+</style>
+
+<script>
+  let currentOrderId = null;
+  let currentOrderStatus = null;
+
+  async function updateOrderStatus(orderId, status) {
+    try {
+      const response = await fetch(`/admin/orders/${orderId}/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update status');
+      }
+
+      // Show success message
+      alert('Order status updated successfully');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to update order status');
+    }
+  }
+
+  async function viewOrderDetails(orderId) {
+    try {
+      currentOrderId = orderId;
+      const response = await fetch(`/admin/orders/${orderId}/details`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const order = await response.json();
+      if (!order) {
+        throw new Error('No order data received');
+      }
+
+      currentOrderStatus = order.status;
+      
+      // Update modal title
+      document.getElementById('modalOrderId').textContent = order.id;
+      
+      // Update timeline
+      updateTimeline(order.status);
+      
+      // Update order info
+      document.getElementById('orderInfo').innerHTML = `
+        <p><strong>Order Date:</strong> ${moment(order.createdAt).format('MMM D, YYYY HH:mm')}</p>
+        <p><strong>Status:</strong> <span class="badge bg-${getStatusColor(order.status)}">${order.status.toUpperCase()}</span></p>
+        <p><strong>Total Amount:</strong> $${parseFloat(order.totalAmount).toFixed(2)}</p>
+        ${order.note ? `<p><strong>Note:</strong> ${order.note}</p>` : ''}
+      `;
+      
+      // Update customer info
+      document.getElementById('customerInfo').innerHTML = `
+        <p><strong>Name:</strong> ${order.fullName}</p>
+        <p><strong>Email:</strong> ${order.email}</p>
+        <p><strong>Phone:</strong> ${order.phone}</p>
+        <p><strong>Address:</strong><br>
+        ${order.address},<br>
+        ${order.ward}, ${order.district},<br>
+        ${order.city}</p>
+      `;
+      
+      // Update order items
+      document.getElementById('orderItems').innerHTML = `
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Price</th>
+              <th>Quantity</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${order.items.map(item => `
+              <tr>
+                <td>
+                  <div class="d-flex align-items-center">
+                    <img src="${item.product.image || '/images/default-product.jpg'}" 
+                         class="order-item-image me-2" 
+                         alt="${item.product.name}">
+                    <span>${item.product.name}</span>
+                  </div>
+                </td>
+                <td>$${parseFloat(item.price).toFixed(2)}</td>
+                <td>${item.quantity}</td>
+                <td class="text-end">$${(parseFloat(item.price) * item.quantity).toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="text-end"><strong>Total</strong></td>
+              <td class="text-end"><strong>$${parseFloat(order.totalAmount).toFixed(2)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      `;
+      
+      // Update buttons
+      updateActionButtons(order.status);
+      
+      // Show modal
+      const modal = new bootstrap.Modal(document.getElementById('orderDetailsModal'));
+      modal.show();
+    } catch (error) {
+      console.error('Error loading order details:', error);
+      alert(`Failed to load order details: ${error.message}`);
+    }
+  }
+
+  function updateTimeline(status) {
+    const steps = ['pending', 'processing', 'shipped', 'delivered'];
+    const currentIndex = steps.indexOf(status);
+    
+    steps.forEach((step, index) => {
+      const element = document.querySelector(`.timeline-step[data-status="${step}"]`);
+      if (index < currentIndex) {
+        element.classList.add('completed');
+        element.classList.remove('active');
+      } else if (index === currentIndex) {
+        element.classList.add('active');
+        element.classList.remove('completed');
+      } else {
+        element.classList.remove('completed', 'active');
+      }
+    });
+  }
+
+  function updateActionButtons(status) {
+    const btnCancel = document.getElementById('btnCancel');
+    const btnNextStatus = document.getElementById('btnNextStatus');
+    
+    // Show/hide cancel button
+    btnCancel.style.display = ['pending', 'processing'].includes(status) ? 'block' : 'none';
+    
+    // Update next status button
+    switch(status) {
+      case 'pending':
+        btnNextStatus.textContent = 'Process Order';
+        btnNextStatus.style.display = 'block';
+        break;
+      case 'processing':
+        btnNextStatus.textContent = 'Mark as Shipped';
+        btnNextStatus.style.display = 'block';
+        break;
+      case 'shipped':
+        btnNextStatus.textContent = 'Mark as Delivered';
+        btnNextStatus.style.display = 'block';
+        break;
+      default:
+        btnNextStatus.style.display = 'none';
+    }
+  }
+
+  function getStatusColor(status) {
+    switch(status) {
+      case 'pending': return 'warning';
+      case 'processing': return 'info';
+      case 'shipped': return 'primary';
+      case 'delivered': return 'success';
+      case 'cancelled': return 'danger';
+      default: return 'secondary';
+    }
+  }
+
+  async function updateStatus() {
+    if (!currentOrderId) return;
+    
+    const statusFlow = {
+      'pending': 'processing',
+      'processing': 'shipped',
+      'shipped': 'delivered'
+    };
+    
+    const newStatus = statusFlow[currentOrderStatus];
+    if (!newStatus) return;
+    
+    try {
+      const response = await fetch(`/admin/orders/${currentOrderId}/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) throw new Error('Failed to update status');
+      
+      // Refresh order details
+      await viewOrderDetails(currentOrderId);
+      
+      // Refresh main table
+      location.reload();
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to update order status');
+    }
+  }
+
+  async function cancelOrder() {
+    if (!currentOrderId) return;
+    
+    if (!confirm('Are you sure you want to cancel this order?')) return;
+    
+    try {
+      const response = await fetch(`/admin/orders/${currentOrderId}/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'cancelled' })
+      });
+
+      if (!response.ok) throw new Error('Failed to cancel order');
+      
+      // Close modal and refresh page
+      bootstrap.Modal.getInstance(document.getElementById('orderDetailsModal')).hide();
+      location.reload();
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to cancel order');
+    }
+  }
+
+  function exportOrders() {
+    // Implement export functionality
+    alert('Export functionality will be implemented');
+  }
+
+  // Filter orders based on status
+  document.getElementById("orderFilter").addEventListener("change", function() {
+    const status = this.value;
+    const rows = document.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+      const statusSelect = row.querySelector('.status-select');
+      if (status === 'all' || (statusSelect && statusSelect.value === status)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  });
+</script>
+
+<%- include('./partials/footer') %>
